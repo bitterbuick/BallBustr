@@ -30,9 +30,9 @@ Before running this game, ensure you have Python installed on your computer. Pyt
    ```
 3. **Controls**
 
-    Left Arrow Key: Move the paddle left.
-    Right Arrow Key: Move the paddle right.
-    Space Bar: Launch the ball if it is not in motion or reset the ball after a game over.
+    - Left Arrow Key: Move the paddle left.
+    - Right Arrow Key: Move the paddle right.
+    - Space Bar: Launch the ball if it is not in motion or reset the ball after a game over.
 
 ## Bottom of README Stuff
 
