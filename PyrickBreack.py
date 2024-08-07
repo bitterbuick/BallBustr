@@ -1,4 +1,9 @@
 import turtle
+import math
+
+# Constants for speed limits
+MAX_BALL_SPEED = 1.5
+PADDLE_SPEED = MAX_BALL_SPEED + 0.5
 
 # Screen setup
 wn = turtle.Screen()
@@ -6,6 +11,17 @@ wn.title("Ball Buster")
 wn.bgcolor("black")
 wn.setup(width=600, height=600)
 wn.tracer(0)  # Manually update the screen for better control over animations
+
+# Border drawing
+border = turtle.Turtle(visible=False)
+border.color("white")
+border.penup()
+border.goto(-300, 290)  # Start slightly outside the outermost bricks
+border.pendown()
+for _ in range(4):
+    border.forward(600)
+    border.right(90)
+border.penup()
 
 # Paddle class definition
 class Paddle(turtle.Turtle):
@@ -27,12 +43,12 @@ class Paddle(turtle.Turtle):
         Move the paddle left or right based on user input.
         """
         if self.moving_left:
-            x = self.xcor() - 3
+            x = self.xcor() - PADDLE_SPEED
             if x < -250:
                 x = -250
             self.setx(x)
         if self.moving_right:
-            x = self.xcor() + 3
+            x = self.xcor() + PADDLE_SPEED
             if x > 250:
                 x = 250
             self.setx(x)
@@ -106,7 +122,21 @@ class Ball(turtle.Turtle):
         Slightly change the ball's angle to prevent hitting the last brick.
         """
         if len(game.bricks) == 1:
-            self.dx += 0.5  # Slightly alter the x-direction speed
+            angle = math.atan2(self.dy, self.dx)
+            angle += math.radians(10)  # Change the angle slightly
+            speed = math.sqrt(self.dx**2 + self.dy**2)
+            self.dx = speed * math.cos(angle)
+            self.dy = speed * math.sin(angle)
+
+    def adjust_speed(self):
+        """
+        Ensure the ball's speed does not exceed the maximum allowed speed.
+        """
+        speed = math.sqrt(self.dx**2 + self.dy**2)
+        if speed > MAX_BALL_SPEED:
+            factor = MAX_BALL_SPEED / speed
+            self.dx *= factor
+            self.dy *= factor
 
 # Brick class definition
 class Brick(turtle.Turtle):
@@ -142,10 +172,10 @@ class BrickBreaker:
         Create bricks and arrange them in rows with different colors.
         """
         colors = ["red", "yellow", "green", "blue", "orange"]
-        start_x = -280
+        start_x = -270
         for y in range(50, 250, 21):
             color = colors[(y // 21) % len(colors)]
-            for x in range(start_x, 281, 61):
+            for x in range(start_x, 281, 61):  # Ensure gaps are small enough to prevent passing
                 brick = Brick(x, y, color)
                 self.bricks.append(brick)
 
@@ -171,6 +201,7 @@ class BrickBreaker:
             wn.update()
             self.paddle.move()
             self.ball.move()
+            self.ball.adjust_speed()  # Ensure the ball doesn't exceed max speed
 
             # Paddle collision
             if (
@@ -179,11 +210,19 @@ class BrickBreaker:
                 and self.paddle.xcor() - 60 < self.ball.xcor() < self.paddle.xcor() + 60
             ):
                 self.ball.sety(-240)  # Position the ball just above the paddle
+                hit_pos = self.ball.xcor() - self.paddle.xcor()  # Calculate hit position
                 self.ball.dy *= -1
+
+                # Adjust angle based on where it hits the paddle
+                self.ball.dx = 2 * (hit_pos / 60)
+                self.ball.adjust_speed()
 
             # Brick collision
             for brick in self.bricks:
-                if brick.distance(self.ball) < 20:
+                if (
+                    brick.xcor() - 30 < self.ball.xcor() < brick.xcor() + 30
+                    and brick.ycor() - 10 < self.ball.ycor() < brick.ycor() + 10
+                ):
                     self.ball.dy *= -1
                     brick.hideturtle()  # Hide the brick
                     self.bricks.remove(brick)
