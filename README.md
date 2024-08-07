@@ -18,7 +18,7 @@ Before running this game, ensure you have Python installed on your computer. Pyt
 1. **Clone the Repository**
 
    ```bash
-   git clone https://github.com/yourusername/ball-buster.git
+   git clone https://github.com/bitterbuick/ball-buster.git
    cd ball-buster
    ```
 2. **Run the Game**
