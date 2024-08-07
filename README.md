@@ -38,7 +38,7 @@ Before running this game, ensure you have Python installed on your computer. Pyt
 
 **Contribution**: 
     Contributions to _Ball Buster_ are welcome! Here are a few ways you can help:
-    Don't worry about it. This was an old app I made for college that I decided to mess around with.
+    - Don't worry about it. This was an old app I made for college that I decided to mess around with.
 
 **License**: 
     This project is open source and available under the MIT License.
