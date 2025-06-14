@@ -26,7 +26,7 @@ Before running this game, ensure you have Python installed on your computer. Pyt
    Execute the script in your Python environment:
 
    ```bash
-     python ball_buster.py
+   python PyrickBreack.py
    ```
 3. **Controls**
 
