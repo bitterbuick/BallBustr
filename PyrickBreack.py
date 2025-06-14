@@ -1,3 +1,5 @@
+"""Simple brick-breaker style game using the turtle module."""
+
 import turtle
 import math
 
@@ -117,11 +119,15 @@ class Ball(turtle.Turtle):
             self.moving = True
             self.clear_message()  # Clear the message when the ball is launched
 
-    def change_angle(self):
+    def change_angle(self, bricks_remaining):
+        """Adjust the angle slightly when only one brick remains.
+
+        The previous implementation referenced the global ``game`` object
+        directly, which broke encapsulation and caused errors during unit
+        testing.  The method now receives the number of remaining bricks as an
+        argument so it can operate independently of global state.
         """
-        Slightly change the ball's angle to prevent hitting the last brick.
-        """
-        if len(game.bricks) == 1:
+        if bricks_remaining == 1:
             angle = math.atan2(self.dy, self.dx)
             angle += math.radians(10)  # Change the angle slightly
             speed = math.sqrt(self.dx**2 + self.dy**2)
@@ -226,7 +232,8 @@ class BrickBreaker:
                     self.ball.dy *= -1
                     brick.hideturtle()  # Hide the brick
                     self.bricks.remove(brick)
-                    self.ball.change_angle()  # Change angle if last brick is present
+                    # Pass the remaining brick count to adjust the ball angle
+                    self.ball.change_angle(len(self.bricks))
                     break  # Exit the loop to avoid modifying the list during iteration
 
             # Bottom wall collision
@@ -245,5 +252,6 @@ wn.onkeyrelease(game.paddle.stop_left, "Left")
 wn.onkeypress(game.paddle.go_right, "Right")
 wn.onkeyrelease(game.paddle.stop_right, "Right")
 wn.onkeypress(game.ball.launch_ball, "space")
+# Start the main game loop. This function contains its own ``while True`` so
+# it blocks here and keeps the turtle window open.
 game.run()
-wn.mainloop()
