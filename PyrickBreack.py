@@ -2,10 +2,13 @@
 
 import turtle
 import math
+import time
 
 # Constants for speed limits
 MAX_BALL_SPEED = 1.5
 PADDLE_SPEED = MAX_BALL_SPEED + 0.5
+TARGET_FPS = 60
+FRAME_TIME = 1.0 / TARGET_FPS
 
 # Screen setup
 wn = turtle.Screen()
@@ -56,27 +59,15 @@ class Paddle(turtle.Turtle):
             self.setx(x)
 
     def go_left(self):
-        """
-        Set the flag to move the paddle left.
-        """
         self.moving_left = True
 
     def stop_left(self):
-        """
-        Clear the flag to stop moving the paddle left.
-        """
         self.moving_left = False
 
     def go_right(self):
-        """
-        Set the flag to move the paddle right.
-        """
         self.moving_right = True
 
     def stop_right(self):
-        """
-        Clear the flag to stop moving the paddle right.
-        """
         self.moving_right = False
 
 # Ball class definition
@@ -89,10 +80,10 @@ class Ball(turtle.Turtle):
         self.color("red")
         self.penup()
         self.goto(0, -100)
-        self.dx = 0  # Initialize with no horizontal movement
-        self.dy = 0  # Initialize with no vertical movement
-        self.moving = False  # Track whether the ball is moving
-        self.clear_message = clear_message_callback  # Method to clear the message
+        self.dx = 0
+        self.dy = 0
+        self.moving = False
+        self.clear_message = clear_message_callback
 
     def move(self):
         """
@@ -114,25 +105,53 @@ class Ball(turtle.Turtle):
         Start the ball movement with an initial velocity.
         """
         if not self.moving:
-            self.dx = 1  # Set initial horizontal speed
-            self.dy = 1  # Set initial vertical speed
+            self.dx = 1
+            self.dy = 1
             self.moving = True
-            self.clear_message()  # Clear the message when the ball is launched
+            self.clear_message()
 
-    def change_angle(self, bricks_remaining):
-        """Adjust the angle slightly when only one brick remains.
+    def avoid_last_brick(self, brick):
+        """Continuously steer the ball away from the last brick each frame.
 
-        The previous implementation referenced the global ``game`` object
-        directly, which broke encapsulation and caused errors during unit
-        testing.  The method now receives the number of remaining bricks as an
-        argument so it can operate independently of global state.
+        Predicts where the ball will be when it reaches the brick's y-level.
+        If that predicted position lands on the brick, rotates the velocity
+        vector by a tiny amount until the trajectory clears the brick.
+        Because it's applied gradually and stops as soon as the ball is off
+        course, the deflection is imperceptible to the player.
         """
-        if bricks_remaining == 1:
-            angle = math.atan2(self.dy, self.dx)
-            angle += math.radians(10)  # Change the angle slightly
-            speed = math.sqrt(self.dx**2 + self.dy**2)
-            self.dx = speed * math.cos(angle)
-            self.dy = speed * math.sin(angle)
+        if not self.moving or self.dy <= 0 or abs(self.dy) < 0.1:
+            return
+        # Only act when ball is below the brick and heading toward it
+        height_diff = brick.ycor() - self.ycor()
+        if height_diff <= 0 or height_diff > 150:
+            return
+
+        steps = height_diff / self.dy
+        predicted_x = self.xcor() + self.dx * steps
+
+        # Correct for wall bounces in the prediction
+        for _ in range(6):
+            if predicted_x > 290:
+                predicted_x = 580 - predicted_x
+            elif predicted_x < -290:
+                predicted_x = -580 - predicted_x
+            else:
+                break
+
+        # Brick half-width is 30; add a small margin so the miss is clean
+        miss_margin = 36
+        if not (brick.xcor() - miss_margin < predicted_x < brick.xcor() + miss_margin):
+            return  # Already off course — nothing to do
+
+        # Rotate velocity vector by 0.4° away from the brick
+        angle = math.atan2(self.dy, self.dx)
+        speed = math.sqrt(self.dx ** 2 + self.dy ** 2)
+        if predicted_x <= brick.xcor():
+            angle -= math.radians(0.4)  # nudge left
+        else:
+            angle += math.radians(0.4)  # nudge right
+        self.dx = speed * math.cos(angle)
+        self.dy = speed * math.sin(angle)
 
     def adjust_speed(self):
         """
@@ -164,13 +183,13 @@ class BrickBreaker:
     """
     def __init__(self):
         self.paddle = Paddle()
-        self.ball = Ball(self.clear_message)  # Pass the clear_message method
+        self.ball = Ball(self.clear_message)
         self.bricks = []
         self.create_bricks()
         self.message = turtle.Turtle(visible=False)
         self.message.color("white")
         self.message.penup()
-        self.message.goto(0, 250)  # Position message well above the highest row of bricks
+        self.message.goto(0, 250)
         self.display_message("Press Space to Bust Some Balls", True)
 
     def create_bricks(self):
@@ -181,33 +200,34 @@ class BrickBreaker:
         start_x = -270
         for y in range(50, 250, 21):
             color = colors[(y // 21) % len(colors)]
-            for x in range(start_x, 281, 61):  # Ensure gaps are small enough to prevent passing
+            for x in range(start_x, 281, 61):
                 brick = Brick(x, y, color)
                 self.bricks.append(brick)
 
     def display_message(self, msg, large=False):
-        """
-        Display a message on the screen.
-        """
         self.message.clear()
         font = ("Arial", 24, "bold") if large else ("Arial", 14, "normal")
         self.message.write(msg, align="center", font=font)
 
     def clear_message(self):
-        """
-        Clear any message currently displayed.
-        """
         self.message.clear()
 
     def run(self):
         """
-        Main game loop for updating the game state and handling collisions.
+        Main game loop — runs at a fixed frame rate so ball speed is
+        consistent regardless of how many bricks remain on screen.
         """
         while True:
+            frame_start = time.time()
+
             wn.update()
             self.paddle.move()
             self.ball.move()
-            self.ball.adjust_speed()  # Ensure the ball doesn't exceed max speed
+            self.ball.adjust_speed()
+
+            # Steer ball away from the last brick each frame
+            if len(self.bricks) == 1:
+                self.ball.avoid_last_brick(self.bricks[0])
 
             # Paddle collision
             if (
@@ -215,11 +235,9 @@ class BrickBreaker:
                 and self.ball.ycor() > -250
                 and self.paddle.xcor() - 60 < self.ball.xcor() < self.paddle.xcor() + 60
             ):
-                self.ball.sety(-240)  # Position the ball just above the paddle
-                hit_pos = self.ball.xcor() - self.paddle.xcor()  # Calculate hit position
+                self.ball.sety(-240)
+                hit_pos = self.ball.xcor() - self.paddle.xcor()
                 self.ball.dy *= -1
-
-                # Adjust angle based on where it hits the paddle
                 self.ball.dx = 2 * (hit_pos / 60)
                 self.ball.adjust_speed()
 
@@ -230,19 +248,23 @@ class BrickBreaker:
                     and brick.ycor() - 10 < self.ball.ycor() < brick.ycor() + 10
                 ):
                     self.ball.dy *= -1
-                    brick.hideturtle()  # Hide the brick
+                    brick.hideturtle()
                     self.bricks.remove(brick)
-                    # Pass the remaining brick count to adjust the ball angle
-                    self.ball.change_angle(len(self.bricks))
-                    break  # Exit the loop to avoid modifying the list during iteration
+                    break
 
             # Bottom wall collision
             if self.ball.ycor() < -290:
-                self.ball.goto(0, -100)  # Reset ball position
+                self.ball.goto(0, -100)
                 self.ball.dx = 0
                 self.ball.dy = 0
                 self.ball.moving = False
                 self.display_message("Press Space to Bust Some Balls", True)
+
+            # Cap to TARGET_FPS so ball speed is tied to real time, not loop speed
+            elapsed = time.time() - frame_start
+            sleep_time = FRAME_TIME - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
 
 # Keyboard bindings and event handling
 game = BrickBreaker()
