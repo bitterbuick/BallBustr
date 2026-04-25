@@ -39,24 +39,22 @@ class Paddle(turtle.Turtle):
         self.shapesize(stretch_wid=1, stretch_len=6)
         self.penup()
         self.goto(0, -250)
-        self.speed("fastest")  # Set the turtle speed to the maximum possible
+        self.speed("fastest")
         self.moving_left = False
         self.moving_right = False
+        self.vx = 0.0  # current velocity, smoothed each frame
 
     def move(self):
-        """
-        Move the paddle left or right based on user input.
-        """
+        """Move the paddle with exponential velocity smoothing so direction
+        changes feel fluid rather than abruptly stopping and restarting."""
+        target = 0
         if self.moving_left:
-            x = self.xcor() - PADDLE_SPEED
-            if x < -250:
-                x = -250
-            self.setx(x)
+            target = -PADDLE_SPEED
         if self.moving_right:
-            x = self.xcor() + PADDLE_SPEED
-            if x > 250:
-                x = 250
-            self.setx(x)
+            target = PADDLE_SPEED
+        self.vx += (target - self.vx) * 0.4  # glide 40% toward target each frame
+        x = max(-250, min(250, self.xcor() + self.vx))
+        self.setx(x)
 
     def go_left(self):
         self.moving_left = True
@@ -113,20 +111,22 @@ class Ball(turtle.Turtle):
     def avoid_last_brick(self, brick):
         """Continuously steer the ball away from the last brick each frame.
 
-        Predicts where the ball will be when it reaches the brick's y-level.
-        If that predicted position lands on the brick, rotates the velocity
-        vector by a tiny amount until the trajectory clears the brick.
-        Because it's applied gradually and stops as soon as the ball is off
-        course, the deflection is imperceptible to the player.
+        Works for both upward and downward approach. Predicts the x position
+        when the ball reaches the brick's y-level; if that lands on the brick,
+        rotates velocity by 0.6°/frame until the trajectory clears. Self-
+        limiting: stops as soon as the ball is off course.
         """
-        if not self.moving or self.dy <= 0 or abs(self.dy) < 0.1:
+        if not self.moving or abs(self.dy) < 0.1:
             return
-        # Only act when ball is below the brick and heading toward it
-        height_diff = brick.ycor() - self.ycor()
-        if height_diff <= 0 or height_diff > 300:
+        bx, by = brick.xcor(), brick.ycor()
+        height_diff = by - self.ycor()
+        # Must be heading toward the brick's y-level
+        if self.dy > 0 and (height_diff <= 0 or height_diff > 300):
+            return
+        if self.dy < 0 and (height_diff >= 0 or height_diff < -300):
             return
 
-        steps = height_diff / self.dy
+        steps = height_diff / self.dy  # positive when heading toward brick
         predicted_x = self.xcor() + self.dx * steps
 
         # Correct for wall bounces in the prediction
@@ -138,15 +138,13 @@ class Ball(turtle.Turtle):
             else:
                 break
 
-        # Brick half-width is 30; add a small margin so the miss is clean
-        miss_margin = 36
-        if not (brick.xcor() - miss_margin < predicted_x < brick.xcor() + miss_margin):
-            return  # Already off course — nothing to do
+        miss_margin = 36  # slightly wider than actual brick half-width
+        if not (bx - miss_margin < predicted_x < bx + miss_margin):
+            return  # already off course
 
-        # Rotate velocity vector by 0.4° away from the brick
         angle = math.atan2(self.dy, self.dx)
         speed = math.sqrt(self.dx ** 2 + self.dy ** 2)
-        if predicted_x <= brick.xcor():
+        if predicted_x <= bx:
             angle -= math.radians(0.6)  # nudge left
         else:
             angle += math.radians(0.6)  # nudge right
@@ -212,6 +210,26 @@ class BrickBreaker:
     def clear_message(self):
         self.message.clear()
 
+    def _nudge_clear_of_last_brick(self):
+        """Called the moment the second-to-last brick falls.
+
+        If the ball is at the same y-level as the last brick (the common case
+        where two bricks in the same row remain and the ball bounces sideways
+        into the second one), the gradual avoid_last_brick nudge has zero
+        frames to work. Push the ball's y just outside the collision zone so
+        it clears on the very next frame. The shift is ≤3 px — invisible at
+        game speed.
+        """
+        if not self.bricks:
+            return
+        last = self.bricks[0]
+        if abs(self.ball.ycor() - last.ycor()) <= 12:
+            # Move ball to just outside the brick's vertical collision band
+            if self.ball.dy <= 0:
+                self.ball.sety(last.ycor() - 13)
+            else:
+                self.ball.sety(last.ycor() + 13)
+
     def run(self):
         """
         Main game loop — runs at a fixed frame rate so ball speed is
@@ -250,6 +268,8 @@ class BrickBreaker:
                     self.ball.dy *= -1
                     brick.hideturtle()
                     self.bricks.remove(brick)
+                    if len(self.bricks) == 1:
+                        self._nudge_clear_of_last_brick()
                     break
 
             # Bottom wall collision
