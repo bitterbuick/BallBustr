@@ -4,8 +4,8 @@ import turtle
 import math
 import time
 
-# Constants for speed limits
-MAX_BALL_SPEED = 1.5
+# Constants for speed limits — tuned for a fixed 60 FPS loop
+MAX_BALL_SPEED = 7.5
 PADDLE_SPEED = MAX_BALL_SPEED + 0.5
 TARGET_FPS = 60
 FRAME_TIME = 1.0 / TARGET_FPS
@@ -105,8 +105,8 @@ class Ball(turtle.Turtle):
         Start the ball movement with an initial velocity.
         """
         if not self.moving:
-            self.dx = 1
-            self.dy = 1
+            self.dx = 5
+            self.dy = 5
             self.moving = True
             self.clear_message()
 
@@ -123,7 +123,7 @@ class Ball(turtle.Turtle):
             return
         # Only act when ball is below the brick and heading toward it
         height_diff = brick.ycor() - self.ycor()
-        if height_diff <= 0 or height_diff > 150:
+        if height_diff <= 0 or height_diff > 300:
             return
 
         steps = height_diff / self.dy
@@ -147,9 +147,9 @@ class Ball(turtle.Turtle):
         angle = math.atan2(self.dy, self.dx)
         speed = math.sqrt(self.dx ** 2 + self.dy ** 2)
         if predicted_x <= brick.xcor():
-            angle -= math.radians(0.4)  # nudge left
+            angle -= math.radians(0.6)  # nudge left
         else:
-            angle += math.radians(0.4)  # nudge right
+            angle += math.radians(0.6)  # nudge right
         self.dx = speed * math.cos(angle)
         self.dy = speed * math.sin(angle)
 
@@ -238,7 +238,7 @@ class BrickBreaker:
                 self.ball.sety(-240)
                 hit_pos = self.ball.xcor() - self.paddle.xcor()
                 self.ball.dy *= -1
-                self.ball.dx = 2 * (hit_pos / 60)
+                self.ball.dx = 10 * (hit_pos / 60)
                 self.ball.adjust_speed()
 
             # Brick collision
